@@ -222,21 +222,15 @@ The JavaScript track evaluates the performance of the V8 JavaScript engine runni
 
 * **Technical Workarounds & Engine Bypasses**:
 1. **Node.js 2 GiB File Limit**: Node's default `fs.readFileSync` throws a `RangeError [ERR_FS_FILE_TOO_LARGE]` when attempting to load files exceeding 2 GiB. We implemented a custom chunked binary reader in `js/utils.js` using `fs.openSync` and `fs.readSync` in a loop, pre-allocating a single large `ArrayBuffer` to bypass this V8 boundary.
-2. **Shared ArrayBuffer Corruption**: Libraries like `fflate.unzipSync` decompress files into a shared backing `ArrayBuffer` to avoid memory copies. Instantiating typed arrays using `new Float32Array(data.buffer)` reads from the start of the shared buffer instead of the decompression slice, causing coordinate/offset corruption. We resolved this by explicitly passing `data.byteOffset` and `data.byteLength` parameters:
+2. **Shared ArrayBuffer Corruption**: Libraries like `fflate.unzipSync` decompress files into a shared backing `ArrayBuffer` to avoid memory copies. Instantiating typed arrays using `new Float32Array(data.buffer)` reads from the start of the shared buffer instead of the decompression slice, causing coordinate/offset corruption. We resolved this by explicitly passing `data.byteOffset` and `data.byteLength` parameters: 
 ```javascript
 new Float32Array(data.buffer, data.byteOffset, data.byteLength / 4)
 
 ```
-
-
-
-
-
-```
-    3.  **V8 Heap Memory Configuration**: Large datasets (up to 8.1 GB zip archives containing 6 GB geometry) cause Node.js processes to exceed the default heap limit (1.4 GB) and crash with out-of-memory (OOM) errors. The benchmark runner must be invoked with `--max-old-space-size=16384` to expand the heap limit to 16 GB.
-    4.  **Garbage Collection**: Node is run with the `--expose-gc` flag. Programmatic memory reclamation is triggered before each run using `global.gc()`.
+3.  **V8 Heap Memory Configuration**: Large datasets (up to 8.1 GB zip archives containing 6 GB geometry) cause Node.js processes to exceed the default heap limit (1.4 GB) and crash with out-of-memory (OOM) errors. The benchmark runner must be invoked with `--max-old-space-size=16384` to expand the heap limit to 16 GB.
+4.  **Garbage Collection**: Node is run with the `--expose-gc` flag. Programmatic memory reclamation is triggered before each run using `global.gc()`.
 *   **Write Capability**:
-    Supports writing all formats (TRX, TRK, TCK, VTK) using high-performance chunked encoders in `js/utils.js`. The TRX format is serialized directly to a zip-based archive using `fflate.zipSync`.
+Supports writing all formats (TRX, TRK, TCK, VTK) using high-performance chunked encoders in `js/utils.js`. The TRX format is serialized directly to a zip-based archive using `fflate.zipSync`.
 
 ---
 
@@ -271,36 +265,24 @@ The Python module requires Python 3.8+ along with several scientific neuroimagin
 
 1. **Create a Virtual Environment** (recommended to avoid package conflicts):
 ```bash
-
-```
-
-
-
 python3 -m venv venv
 source venv/bin/activate
 
 ```
 2.  **Install PIP Dependencies**:
     First install standard pre-requisite libraries:
-    ```bash
+```bash
 pip install numpy nibabel dipy fury
-
 ```
 
 3. **Install the Local `trx-python` Library**:
 Since we are benchmarking the local implementation, install it in editable mode:
 ```bash
 pip install -e ../trx-python
-
 ```
-
-
-
-```
-    *Alternatively, install all from the requirements file:*
-    ```bash
-    pip install -r python/requirements.txt
-
+*Alternatively, install all from the requirements file:*
+```bash
+pip install -r python/requirements.txt
 ```
 
 ### 🦀 Rust Setup
@@ -309,27 +291,19 @@ The Rust module relies on the Cargo build system and the Rust compiler (`rustc`)
 
 1. **Ensure Rust is installed** (via [rustup](https://rustup.rs/)):
 ```bash
-
-```
-
-
-
 rustc --version
 cargo --version
 
 ```
 2.  **Compilation**:
-    The Rust track links dynamically to `trx-rs` at the relative sibling path `../../trx-rs`. Compiling with release flags is critical to enable compiler optimizations:
-    ```bash
+The Rust track links dynamically to `trx-rs` at the relative sibling path `../../trx-rs`. Compiling with release flags is critical to enable compiler optimizations:
+```bash
 cd rust
 cargo build --release
 
 ```
-
-```
 The compiled binary will be placed relative to the workspace at `target/release/trx-nature-2026-benchmark-rust`.
 
-```
 
 ### ⚡ C++ Setup
 
@@ -339,28 +313,20 @@ The C++ benchmark runner compiles using CMake and links to the local `trx-cpp` s
 Ensure you have `cmake` (version 3.16+), a C++17 compatible compiler (e.g., `g++` 9+), and `libzip-dev` installed (for ZIP file parsing support).
 On Debian/Ubuntu-based systems:
 ```bash
-
-```
-
-
-
 sudo apt-get install build-essential cmake libzip-dev
 
 ```
 2.  **Configuration & Build**:
-    Create a build directory, run CMake in Release mode, and build in parallel:
-    ```bash
-    cd cpp
-    mkdir -p build && cd build
-    cmake -DCMAKE_BUILD_TYPE=Release ..
-    make -j$(nproc)
-
+Create a build directory, run CMake in Release mode, and build in parallel:
+```bash
+cd cpp
+mkdir -p build && cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make -j$(nproc)
 ```
 
-```
 The compiled binary will be created at `cpp/build/trx_benchmark`.
 
-```
 
 ### 🌐 JavaScript (Node.js) Setup
 
@@ -368,21 +334,15 @@ The JavaScript track requires Node.js (version 16 or newer) and the Node Package
 
 1. **Ensure Node.js and NPM are installed**:
 ```bash
-
-```
-
-
-
 node --version
 npm --version
 
 ```
 2.  **Install Dependencies**:
-    Initialize dependencies (`fflate`, `fzstd`, and `gl-matrix`) in the `js` sub-folder:
-    ```bash
+Initialize dependencies (`fflate`, `fzstd`, and `gl-matrix`) in the `js` sub-folder:
+```bash
 cd js
 npm install
-
 ```
 
 ---
@@ -406,39 +366,30 @@ The orchestration scripts compile all targets, run the benchmark cycles, and gen
 
 1. **Run Everything (Build, Run, & Report)**:
 ```bash
-
-```
-
-
-
 ./run_benchmarks.sh
 
 ```
-    This triggers:
-    - Compilation of C++ in Release mode.
-    - Compilation of Rust in Release mode.
-    - JS dependency installation.
-    - Full sequential benchmark execution of Python, Rust, JavaScript, and C++.
-    - Aggregation of results into `results/summary.md`.
+This triggers:
+- Compilation of C++ in Release mode.
+- Compilation of Rust in Release mode.
+- JS dependency installation.
+- Full sequential benchmark execution of Python, Rust, JavaScript, and C++.
+- Aggregation of results into `results/summary.md`.
 
 2.  **Targeted Pipeline Commands**:
-    *   **Build Only**: Compile Rust and C++ runners and set up Node packages.
-        ```bash
+*   **Build Only**: Compile Rust and C++ runners and set up Node packages.
+```bash
 ./run_benchmarks.sh build
 
 ```
 
-```
 *   **Run Only**: Execute the benchmark runs (assuming they are already compiled).
-    ```bash
-
-```
-
+```bash
 ./run_benchmarks.sh run
 
 ```
-    *   **Report Only**: Regenerate the Markdown comparison summary table from existing `results/*.json` files.
-        ```bash
+*   **Report Only**: Regenerate the Markdown comparison summary table from existing `results/*.json` files.
+```bash
 ./run_benchmarks.sh report
 
 ```
@@ -450,16 +401,11 @@ If you want to debug or isolate execution to a single language track, run the sc
 * **Python**:
 ```bash
 python3 python/benchmark.py
-
 ```
 
-
-
-```
 *   **Rust**:
-    ```bash
-    ./rust/target/release/trx-nature-2026-benchmark-rust
-
+```bash
+./rust/target/release/trx-nature-2026-benchmark-rust
 ```
 
 * **C++**:
@@ -468,13 +414,10 @@ python3 python/benchmark.py
 
 ```
 
-
-
-```
 *   **JavaScript**:
-    *CRITICAL: You must pass the `--expose-gc` flag (to allow programmatic garbage collection) and expand heap space using `--max-old-space-size=16384` to prevent Out Of Memory (OOM) crashes on large files.*
-    ```bash
-    node --expose-gc --max-old-space-size=16384 js/benchmark.mjs
+*CRITICAL: You must pass the `--expose-gc` flag (to allow programmatic garbage collection) and expand heap space using `--max-old-space-size=16384` to prevent Out Of Memory (OOM) crashes on large files.*
+```bash
+node --expose-gc --max-old-space-size=16384 js/benchmark.mjs
 
 ```
 
