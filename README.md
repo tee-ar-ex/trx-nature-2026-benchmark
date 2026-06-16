@@ -222,13 +222,10 @@ The JavaScript track evaluates the performance of the V8 JavaScript engine runni
 
 * **Technical Workarounds & Engine Bypasses**:
 1. **Node.js 2 GiB File Limit**: Node's default `fs.readFileSync` throws a `RangeError [ERR_FS_FILE_TOO_LARGE]` when attempting to load files exceeding 2 GiB. We implemented a custom chunked binary reader in `js/utils.js` using `fs.openSync` and `fs.readSync` in a loop, pre-allocating a single large `ArrayBuffer` to bypass this V8 boundary.
-2. **Shared ArrayBuffer Corruption**: Libraries like `fflate.unzipSync` decompress files into a shared backing `ArrayBuffer` to avoid memory copies. Instantiating typed arrays using `new Float32Array(data.buffer)` reads from the start of the shared buffer instead of the decompression slice, causing coordinate/offset corruption. We resolved this by explicitly passing `data.byteOffset` and `data.byteLength` parameters: 
-```javascript
-new Float32Array(data.buffer, data.byteOffset, data.byteLength / 4)
-
-```
-3.  **V8 Heap Memory Configuration**: Large datasets (up to 8.1 GB zip archives containing 6 GB geometry) cause Node.js processes to exceed the default heap limit (1.4 GB) and crash with out-of-memory (OOM) errors. The benchmark runner must be invoked with `--max-old-space-size=16384` to expand the heap limit to 16 GB.
-4.  **Garbage Collection**: Node is run with the `--expose-gc` flag. Programmatic memory reclamation is triggered before each run using `global.gc()`.
+2. **Shared ArrayBuffer Corruption**: Libraries like `fflate.unzipSync` decompress files into a shared backing `ArrayBuffer` to avoid memory copies. Instantiating typed arrays natively reads from the start of the shared buffer instead of the decompression slice, causing coordinate/offset corruption. We resolved this by implementing a `getAlignedArray` helper that safely maps bounds using `data.byteOffset` and `data.byteLength`, while enforcing strict byte-alignment boundaries.
+3. **TRK Memory Duplication Wall**: Reading legacy `.trk` files historically sliced the underlying header buffer to create the payload array (`buffer.slice()`). On multi-gigabyte datasets, this instantly violated V8's heap constraints by duplicating the entire file in RAM. We patched `readTRK` to map directly onto the existing buffer using `new Int32Array(buffer, offset)`.
+4.  **V8 Heap Memory Configuration**: Large datasets cause Node.js processes to exceed the default heap limit (1.4 GB) and crash with out-of-memory (OOM) errors. The benchmark runner must be invoked with `--max-old-space-size=16384` to expand the heap limit to 16 GB.
+5.  **Garbage Collection**: Node is run with the `--expose-gc` flag. Programmatic memory reclamation is triggered before each run using `global.gc()`.
 *   **Write Capability**:
 Supports writing all formats (TRX, TRK, TCK, VTK) using high-performance chunked encoders in `js/utils.js`. The TRX format is serialized directly to a zip-based archive using `fflate.zipSync`.
 

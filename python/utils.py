@@ -120,7 +120,8 @@ def load_data(filename):
     elif ext == ".trx":
         obj = load_trx(filename)
         obj.to_memory()
+        obj.streamlines._data = obj.streamlines._data.astype(np.float32)
     else:
         raise ValueError(f"Unsupported extension {ext}")
-    obj.streamlines._data = obj.streamlines._data.astype(np.float32)
+
     return obj

@@ -37,9 +37,10 @@ The benchmark highlights drastic architectural differences between legacy format
 *   **Why?** Parsing `.vtk` and `.trk` requires reading millions of sequential coordinates, unpacking them, and byteswapping them (handling Endianness). C++ and Rust compile this into heavily optimized, vectorized machine code.
 *   **Ratio:** C++ and Rust can parse legacy TRK/VTK files **10x to 15x faster** than Python's `nibabel` library.
 
-### JavaScript Overhead
+### JavaScript Overhead & Hard Limits
 *   **JavaScript is consistently the slowest (up to 3x slower than Python).**
-*   **Why?** V8's single-threaded nature and garbage collection struggle with massive contiguous memory blocks. Reading a 4GB file requires allocating ArrayBuffers, unzipping them (`fflate`), and casting them into `Float32Arrays`, which triggers massive GC pauses.
+*   **Why?** V8's single-threaded nature and garbage collection struggle with massive contiguous memory blocks. Reading a multi-gigabyte file requires allocating ArrayBuffers, unzipping them (`fflate`), and casting them into `Float32Arrays`, which triggers massive GC pauses.
+*   **The 4GB Contiguous Memory Wall:** V8 (`Node.js`) imposes a hard maximum of 4GB for a single `ArrayBuffer` (`Buffer.constants.MAX_LENGTH`). If an uncompressed geometry array inside a `.trx` archive exceeds 4GB, the JavaScript engine will irrevocably throw an `Array buffer allocation failed` exception. Parsing uncompressed datasets >4GB in JS is physically impossible without a streaming, chunk-based architectural rewrite.
 
 ---
 
